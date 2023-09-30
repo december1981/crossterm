@@ -103,10 +103,7 @@ impl InternalEventReader {
         loop {
             while let Some(event) = self.events.pop_front() {
                 if filter.eval(&event) {
-                    while let Some(event) = skipped_events.pop_front() {
-                        self.events.push_back(event);
-                    }
-
+                    self.events.append(&mut skipped_events);
                     return Ok(event);
                 } else {
                     // We can not directly write events back to `self.events`.
