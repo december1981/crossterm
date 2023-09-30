@@ -53,7 +53,7 @@ fn print_events() -> io::Result<()> {
 // This function will keep the first and last resize event.
 fn flush_resize_events(first_resize: (u16, u16)) -> ((u16, u16), (u16, u16)) {
     let mut last_resize = first_resize;
-    while let Ok(true) = poll(Duration::from_millis(50)) {
+    while let Ok(true) = poll(Some(Duration::from_millis(50))) {
         if let Ok(Event::Resize(x, y)) = read() {
             last_resize = (x, y);
         }

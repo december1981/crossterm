@@ -89,7 +89,7 @@
 //!     )?;
 //!     loop {
 //!         // `poll()` waits for an `Event` for a given time period
-//!         if poll(Duration::from_millis(500))? {
+//!         if poll(Some(Duration::from_millis(500)))? {
 //!             // It's guaranteed that the `read()` won't block when the `poll()`
 //!             // function returns `true`
 //!             match read()? {
@@ -137,6 +137,8 @@ use crate::{
     event::{filter::EventFilter, internal::InternalEvent},
     Command,
 };
+#[cfg(feature = "event-stream")]
+use crate::event::sys::Waker;
 use std::fmt::{self, Display};
 use std::time::Duration;
 
@@ -165,7 +167,7 @@ use std::hash::{Hash, Hasher};
 /// fn is_event_available() -> io::Result<bool> {
 ///     // Zero duration says that the `poll` function must return immediately
 ///     // with an `Event` availability information
-///     poll(Duration::from_secs(0))
+///     poll(Some(Duration::from_secs(0)))
 /// }
 /// ```
 ///
@@ -179,11 +181,11 @@ use std::hash::{Hash, Hasher};
 /// fn is_event_available() -> io::Result<bool> {
 ///     // Wait for an `Event` availability for 100ms. It returns immediately
 ///     // if an `Event` is/becomes available.
-///     poll(Duration::from_millis(100))
+///     poll(Some(Duration::from_millis(100)))
 /// }
 /// ```
-pub fn poll(timeout: Duration) -> std::io::Result<bool> {
-    internal::poll(Some(timeout), &EventFilter)
+pub fn poll(timeout: Option<Duration>) -> std::io::Result<bool> {
+    internal::poll(timeout, &EventFilter)
 }
 
 /// Reads a single [`Event`](enum.Event.html).
@@ -217,7 +219,7 @@ pub fn poll(timeout: Duration) -> std::io::Result<bool> {
 ///
 /// fn print_events() -> io::Result<bool> {
 ///     loop {
-///         if poll(Duration::from_millis(100))? {
+///         if poll(Some(Duration::from_millis(100)))? {
 ///             // It's guaranteed that `read` won't block, because `poll` returned
 ///             // `Ok(true)`.
 ///             println!("{:?}", read()?);
@@ -235,6 +237,22 @@ pub fn read() -> std::io::Result<Event> {
     }
 }
 
+/// Allows access to the poll waker to force wake an event poll
+#[cfg(feature = "event-stream")]
+pub struct PollWaker(Waker);
+
+#[cfg(feature = "event-stream")]
+impl PollWaker {
+    pub fn wake(&self) -> std::io::Result<()> {
+        self.0.wake()
+    }
+}
+
+#[cfg(feature = "event-stream")]
+pub fn waker() -> PollWaker {
+    PollWaker(internal::lock_event_reader().waker())
+}
+
 /// Attempts to read a single [`Event`](enum.Event.html) without blocking the thread.
 ///
 /// If no event is found, `None` is returned.
@@ -247,7 +265,7 @@ pub fn read() -> std::io::Result<Event> {
 ///
 /// fn print_all_events() -> io::Result<bool> {
 ///     loop {
-///         if poll(Duration::from_millis(100))? {
+///         if poll(Some(Duration::from_millis(100)))? {
 ///             // Fetch *all* available events at once
 ///             while let Some(event) = try_read() {
 ///                 // ...
